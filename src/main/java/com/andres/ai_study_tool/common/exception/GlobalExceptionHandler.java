@@ -11,35 +11,46 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidInterviewRequestException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidInterview(
+    public ResponseEntity<Map<String, Object>> handleInvalidInterview(
             InvalidInterviewRequestException e
     ) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
-                        "error", "Invalid interview request",
-                        "message", e.getMessage()
+                        "error", "INVALID_INTERVIEW_REQUEST",
+                        "message", safeMessage(e.getMessage())
                 ));
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalState(
+    public ResponseEntity<Map<String, Object>> handleIllegalState(
             IllegalStateException e
     ) {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
-                        "error", "Invalid state",
-                        "message", e.getMessage()
+                        "error", "INVALID_FLOW_STATE",
+                        "message", safeMessage(e.getMessage())
                 ));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneric(Exception e) {
+    public ResponseEntity<Map<String, Object>> handleGeneric(Exception e) {
+        // TODO: replace with proper logger later
+        e.printStackTrace();
+
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
-                        "error", "Internal server error"
+                        "error", "INTERNAL_SERVER_ERROR",
+                        "message", "Something went wrong on our side. Please try again."
                 ));
+    }
+
+    private String safeMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return "An unexpected error occurred.";
+        }
+        return message;
     }
 }

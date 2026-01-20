@@ -16,15 +16,29 @@ public final class JsonGuard {
             throw new IllegalStateException("LLM returned empty response");
         }
 
-        int firstBrace = raw.indexOf('{');
-        int lastBrace = raw.lastIndexOf('}');
+        int braceCount = 0;
+        int startIndex = -1;
 
-        if (firstBrace == -1 || lastBrace == -1 || lastBrace <= firstBrace) {
-            throw new IllegalStateException(
-                    "LLM response does not contain valid JSON:\n" + raw
-            );
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+
+            if (c == '{') {
+                if (braceCount == 0) {
+                    startIndex = i;
+                }
+                braceCount++;
+            } else if (c == '}') {
+                braceCount--;
+                if (braceCount == 0 && startIndex != -1) {
+                    return raw.substring(startIndex, i + 1);
+                }
+            }
         }
 
-        return raw.substring(firstBrace, lastBrace + 1);
+        throw new IllegalStateException(
+                "LLM response does not contain a complete JSON object:\n" + raw
+        );
     }
+
 }
+

@@ -28,11 +28,19 @@ public class CodeEvaluationService {
 
     public CodeResultResponse evaluate(String interviewId, String code) {
 
+        if (interviewId == null || interviewId.trim().isEmpty()) {
+            throw new InvalidInterviewRequestException("Interview ID must not be empty");
+        }
+
+        if (code == null || code.trim().isEmpty()) {
+            throw new InvalidInterviewRequestException("Submitted code must not be empty");
+        }
+
         InterviewStartInternalResponse session =
                 sessionStore.get(interviewId);
 
-        if (session == null) {
-            throw new InvalidInterviewRequestException("Invalid interviewId");
+        if (session.getCodingQuestion() == null) {
+            throw new IllegalStateException("Interview session has no coding question");
         }
 
         String systemPrompt = """
@@ -66,17 +74,44 @@ CANDIDATE CODE:
 """,
                 session.getCodingQuestion().getPrompt(),
                 session.getCodingQuestion().getMethodSignature(),
-                code
+                code.trim()
         );
 
         try {
             String raw = llmClient.generate(systemPrompt, userPrompt);
+
             String json = JsonGuard.extractJsonObject(raw);
-            return objectMapper.readValue(json, CodeResultResponse.class);
+
+            CodeResultResponse result =
+                    objectMapper.readValue(json, CodeResultResponse.class);
+
+            // ---- Defensive sanity checks on LLM output
+            if (result.getFeedback() == null || result.getFeedback().isBlank()) {
+                throw new InvalidInterviewRequestException("LLM returned empty feedback");
+            }
+
+            if (result.getScore() < 0 || result.getScore() > 100) {
+                throw new InvalidInterviewRequestException(
+                        "LLM returned invalid score: " + result.getScore()
+                );
+            }
+
+            return result;
+
+        } catch (InvalidInterviewRequestException e) {
+            throw e;
+
+        } catch (IllegalStateException e) {
+            // JsonGuard failure, missing JSON, etc → deterministic client error
+            throw new InvalidInterviewRequestException(e.getMessage());
+
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new InvalidInterviewRequestException("LLM returned invalid JSON");
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to evaluate code", e);
         }
     }
+
 }
 

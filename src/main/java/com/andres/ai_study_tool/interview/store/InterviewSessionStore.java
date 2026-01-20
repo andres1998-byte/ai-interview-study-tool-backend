@@ -13,14 +13,48 @@ public class InterviewSessionStore {
             new ConcurrentHashMap<>();
 
     public void save(String interviewId, InterviewStartInternalResponse data) {
-        sessions.put(interviewId, data);
+
+        if (interviewId == null || interviewId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Interview ID must not be null or empty");
+        }
+
+        if (data == null) {
+            throw new IllegalArgumentException("Interview session data must not be null");
+        }
+
+        InterviewStartInternalResponse existing =
+                sessions.putIfAbsent(interviewId, data);
+
+        if (existing != null) {
+            throw new IllegalStateException(
+                    "Interview session already exists for ID: " + interviewId
+            );
+        }
     }
 
     public InterviewStartInternalResponse get(String interviewId) {
-        return sessions.get(interviewId);
+
+        if (interviewId == null || interviewId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Interview ID must not be null or empty");
+        }
+
+        InterviewStartInternalResponse data = sessions.get(interviewId);
+
+        if (data == null) {
+            throw new IllegalStateException(
+                    "No interview session found for ID: " + interviewId
+            );
+        }
+
+        return data;
     }
 
     public void remove(String interviewId) {
+
+        if (interviewId == null || interviewId.trim().isEmpty()) {
+            throw new IllegalArgumentException("Interview ID must not be null or empty");
+        }
+
         sessions.remove(interviewId);
     }
 }

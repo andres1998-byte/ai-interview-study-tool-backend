@@ -34,6 +34,10 @@ public final class InterviewSanityValidator {
             String topic,
             List<TheoryQuestion> questions
     ) {
+        if (topic == null || topic.isBlank()) {
+            throw new InvalidInterviewRequestException("Interview topic must not be empty");
+        }
+
         if (questions == null || questions.size() != 5) {
             throw new InvalidInterviewRequestException(
                     "Invalid number of theory questions for topic: " + topic
@@ -43,7 +47,15 @@ public final class InterviewSanityValidator {
         String topicLower = topic.toLowerCase();
         long relevantCount = 0;
 
+        java.util.Set<Integer> seenIds = new java.util.HashSet<>();
+
         for (TheoryQuestion q : questions) {
+
+            if (q == null) {
+                throw new InvalidInterviewRequestException(
+                        "Theory question entry is null"
+                );
+            }
 
             if (q.getId() <= 0) {
                 throw new InvalidInterviewRequestException(
@@ -51,8 +63,16 @@ public final class InterviewSanityValidator {
                 );
             }
 
+            if (!seenIds.add(q.getId())) {
+                throw new InvalidInterviewRequestException(
+                        "Duplicate theory question id: " + q.getId()
+                );
+            }
+
             if (q.getQuestion() == null || q.getQuestion().isBlank()) {
-                throw new InvalidInterviewRequestException("Theory question text is empty");
+                throw new InvalidInterviewRequestException(
+                        "Theory question text is empty"
+                );
             }
 
             if (q.getOptions() == null || q.getOptions().size() != 4) {
@@ -61,9 +81,26 @@ public final class InterviewSanityValidator {
                 );
             }
 
+            for (String opt : q.getOptions()) {
+                if (opt == null || opt.isBlank()) {
+                    throw new InvalidInterviewRequestException(
+                            "Theory question has empty option text"
+                    );
+                }
+            }
+
             if (q.getCorrectAnswer() == null || q.getCorrectAnswer().isBlank()) {
                 throw new InvalidInterviewRequestException(
                         "Theory question missing correct answer"
+                );
+            }
+
+            boolean correctInOptions = q.getOptions().stream()
+                    .anyMatch(o -> o.equalsIgnoreCase(q.getCorrectAnswer().trim()));
+
+            if (!correctInOptions) {
+                throw new InvalidInterviewRequestException(
+                        "Correct answer is not one of the provided options"
                 );
             }
 

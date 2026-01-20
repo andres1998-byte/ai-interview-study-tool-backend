@@ -47,12 +47,17 @@ public final class InterviewStructureValidator {
 
     private static void validateTheoryQuestion(TheoryQuestion q) {
 
+        if (q == null) {
+            throw new InvalidInterviewRequestException(
+                    "Theory question entry is null"
+            );
+        }
+
         if (q.getId() <= 0) {
             throw new InvalidInterviewRequestException(
                     "Theory question has invalid id"
             );
         }
-
 
         if (isBlank(q.getQuestion())) {
             throw new InvalidInterviewRequestException(
@@ -66,6 +71,24 @@ public final class InterviewStructureValidator {
             );
         }
 
+        java.util.Set<String> seenOptions = new java.util.HashSet<>();
+
+        for (String opt : q.getOptions()) {
+            if (isBlank(opt)) {
+                throw new InvalidInterviewRequestException(
+                        "Theory question has empty option text"
+                );
+            }
+
+            String normalized = opt.trim().toLowerCase();
+
+            if (!seenOptions.add(normalized)) {
+                throw new InvalidInterviewRequestException(
+                        "Theory question has duplicate options"
+                );
+            }
+        }
+
         if (isBlank(q.getCorrectAnswer())) {
             throw new InvalidInterviewRequestException(
                     "Theory question missing correctAnswer"
@@ -74,7 +97,9 @@ public final class InterviewStructureValidator {
 
         boolean answerExists = q.getOptions()
                 .stream()
-                .anyMatch(opt -> opt.equals(q.getCorrectAnswer()));
+                .anyMatch(opt ->
+                        opt.trim().equalsIgnoreCase(q.getCorrectAnswer().trim())
+                );
 
         if (!answerExists) {
             throw new InvalidInterviewRequestException(

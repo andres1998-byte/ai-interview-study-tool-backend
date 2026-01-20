@@ -20,23 +20,26 @@ public class TheoryScoringService {
 
     public TheoryResultResponse score(TheoryAnswerSubmission submission) {
 
+        if (submission == null) {
+            throw new InvalidInterviewRequestException("Theory submission body must not be null");
+        }
+
+        if (submission.getInterviewId() == null || submission.getInterviewId().trim().isEmpty()) {
+            throw new InvalidInterviewRequestException("Interview ID must not be empty");
+        }
+
+        if (submission.getAnswers() == null || submission.getAnswers().isEmpty()) {
+            throw new InvalidInterviewRequestException("Theory answers must not be empty");
+        }
+
         InterviewStartInternalResponse interview =
                 sessionStore.get(submission.getInterviewId());
 
-        if (interview == null) {
-            throw new InvalidInterviewRequestException("Interview session not found");
+        if (interview.getTheoryQuestions() == null || interview.getTheoryQuestions().isEmpty()) {
+            throw new IllegalStateException("Interview contains no theory questions");
         }
 
         Map<Integer, String> submittedAnswers = submission.getAnswers();
-
-        // 🔍 DEBUG: verify answers BEFORE scoring
-        interview.getTheoryQuestions().forEach(q -> {
-            System.out.println(
-                    "Q" + q.getId()
-                            + " | Correct: " + q.getCorrectAnswer()
-                            + " | Submitted: " + submission.getAnswers().get(q.getId())
-            );
-        });
 
         int total = interview.getTheoryQuestions().size();
         int correctCount = 0;
@@ -58,23 +61,13 @@ public class TheoryScoringService {
                     new TheoryResultResponse.QuestionResult();
 
             qr.setQuestionId(q.getId());
-            qr.setQuestionText(q.getQuestion());          // ✅ question text
-            qr.setUserAnswer(submitted);                  // ✅ what user chose
-            qr.setCorrectAnswer(q.getCorrectAnswer());    // ✅ expected answer
+            qr.setQuestionText(q.getQuestion());
+            qr.setUserAnswer(submitted);
+            qr.setCorrectAnswer(q.getCorrectAnswer());
             qr.setCorrect(correct);
 
             results.add(qr);
-
-
-            // 🔍 Debug
-            System.out.println(
-                    "Q" + q.getId()
-                            + " | Correct: [" + q.getCorrectAnswer() + "]"
-                            + " | Submitted: [" + submitted + "]"
-                            + " | Match = " + correct
-            );
         }
-
 
         TheoryResultResponse response = new TheoryResultResponse();
         response.setTotalQuestions(total);
@@ -85,19 +78,7 @@ public class TheoryScoringService {
 
         response.setResults(results);
 
-        System.out.println("===== THEORY SCORING SUMMARY =====");
-        System.out.println("Interview ID: " + submission.getInterviewId());
-        System.out.println("Total questions: " + total);
-        System.out.println("Correct answers: " + correctCount);
-
-        double rawScore = (correctCount * 100.0) / total;
-        System.out.println("Raw percentage (double): " + rawScore);
-
-        int finalScore = (int) Math.round(rawScore);
-        System.out.println("Final rounded score: " + finalScore);
-        System.out.println("=================================");
-
-
         return response;
     }
+
 }

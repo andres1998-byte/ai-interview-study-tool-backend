@@ -59,6 +59,7 @@ SCHEMA:
 }
 """;
 
+        // Include schema again (important) so the retry doesn't drift.
         String retrySystemPrompt = """
 Your previous response was INVALID.
 
@@ -68,26 +69,45 @@ STRICT CORRECTION REQUIRED:
 - Do NOT invent unrelated concepts
 - Follow schema EXACTLY
 - Return ONLY valid JSON
+- No explanations outside JSON
+
+SCHEMA:
+{
+  "theoryQuestions": [
+    {
+      "id": number,
+      "question": "string",
+      "options": ["string"],
+      "correctAnswer": "string"
+    }
+  ],
+  "codingQuestion": {
+    "prompt": "string",
+    "methodSignature": "string"
+  }
+}
 """;
+
+        String safeTopic = topic == null ? "" : topic.trim();
+        String safeLevel = level == null ? "" : level.trim();
+        String safeLanguage = language == null ? "" : language.trim();
 
         String userPrompt = String.format("""
 Topic: %s
 Language: %s
 Level: %s
-""", topic, language, level);
+""", safeTopic, safeLanguage, safeLevel);
 
         try {
-            // ---- FIRST ATTEMPT
             InterviewStartInternalResponse internal =
-                    generateAndValidate(systemPrompt, userPrompt, topic);
+                    generateAndValidate(systemPrompt, userPrompt, safeTopic);
 
             return toPublicResponse(internal);
 
         } catch (InvalidInterviewRequestException firstFailure) {
 
-            // ---- ONE RETRY
             InterviewStartInternalResponse retryInternal =
-                    generateAndValidate(retrySystemPrompt, userPrompt, topic);
+                    generateAndValidate(retrySystemPrompt, userPrompt, safeTopic);
 
             return toPublicResponse(retryInternal);
         }
@@ -101,24 +121,56 @@ Level: %s
     ) {
         try {
             String raw = llmClient.generate(systemPrompt, userPrompt);
+
+            // JsonGuard throws IllegalStateException -> treat as invalid output (retryable)
             String json = JsonGuard.extractJsonObject(raw);
 
             InterviewStartInternalResponse internal =
                     objectMapper.readValue(json, InterviewStartInternalResponse.class);
 
+            // Sanity validator throws InvalidInterviewRequestException -> retryable
             InterviewSanityValidator.validateAll(topic, internal);
+
+            // Extra guard to prevent NPEs later
+            if (internal.getTheoryQuestions() == null || internal.getTheoryQuestions().isEmpty()) {
+                throw new InvalidInterviewRequestException("LLM returned no theory questions");
+            }
+            if (internal.getCodingQuestion() == null) {
+                throw new InvalidInterviewRequestException("LLM returned no coding question");
+            }
 
             return internal;
 
         } catch (InvalidInterviewRequestException e) {
             throw e;
+
+        } catch (IllegalStateException e) {
+            // JsonGuard / missing JSON etc -> retryable
+            throw new InvalidInterviewRequestException(e.getMessage());
+
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Parsing failed -> retryable
+            throw new InvalidInterviewRequestException("LLM returned invalid JSON");
+
         } catch (Exception e) {
+            // True unexpected failures (network, etc.)
             throw new RuntimeException("LLM generation failed", e);
         }
     }
 
+
     // 🔐 Strip answers before returning to client
     private InterviewStartResponse toPublicResponse(InterviewStartInternalResponse internal) {
+
+        if (internal == null) {
+            throw new IllegalStateException("Interview generation returned null internal response");
+        }
+        if (internal.getTheoryQuestions() == null || internal.getTheoryQuestions().isEmpty()) {
+            throw new IllegalStateException("Interview generation returned no theory questions");
+        }
+        if (internal.getCodingQuestion() == null) {
+            throw new IllegalStateException("Interview generation returned no coding question");
+        }
 
         InterviewStartResponse response = new InterviewStartResponse();
         response.setInterviewId(UUID.randomUUID().toString());
@@ -136,7 +188,10 @@ Level: %s
         );
 
         response.setCodingQuestion(internal.getCodingQuestion());
+
         sessionStore.save(response.getInterviewId(), internal);
+
         return response;
     }
+
 }
