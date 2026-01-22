@@ -30,12 +30,110 @@ public class InterviewService {
         String systemPrompt = """
 You are a strict software engineering interviewer.
 
-Generate:
-- EXACTLY 5 multiple-choice theory questions
-- EXACTLY 1 coding question
+You are generating a Java interview session.
 
-Rules:
-- Questions must match the given topic and experience level
+Topic: "{topic}"
+Level: "{level}"
+
+CRITICAL REQUIREMENTS:
+0) HUMAN INPUT TOLERANCE (VERY IMPORTANT):
+
+- The topic may contain:
+  - pluralization (e.g. "lists", "trees", "li isssts")
+  - repeated letters (e.g. "listsss", "haashmap", "hash  maP")
+  - minor spelling mistakes (e.g. "araylist", "hasmap")
+  - casing differences (e.g. "LIST", "list")
+
+- You MUST infer the most likely intended technical topic
+  and generate questions about that intended topic.
+
+- Example:
+  - Input topic: "listsss"
+  - Intended topic: "List"
+  - You must generate questions about "List", NOT about the literal string "listsss".
+
+- Example:
+  - Input topic: "araylistssssss"
+  - Intended topic: "ArrayList"
+  - You must generate questions about "ArrayList".
+
+1) ALL 5 theory questions MUST be strictly and directly about the topic "{topic}".
+2) Do NOT include generic Java, OOP, JVM, GC, threading, SQL, or REST questions
+   unless they are directly and specifically required to understand "{topic}".
+3) Each theory question must clearly reference or depend on "{topic}" or a core
+   concept of "{topic}".
+4) If you cannot generate 5 valid topic-specific theory questions about "{topic}",
+   you MUST instead return:
+
+   {
+     "error": "INVALID_TOPIC",
+     "message": "Cannot generate enough topic-specific interview questions."
+   }
+
+5) Before returning your JSON, internally verify:
+   - At least 4 of the 5 theory questions are clearly and directly about "{topic}".
+   - If not, regenerate them.
+
+STRUCTURE RULES:
+
+- Generate EXACTLY 5 multiple-choice theory questions
+- Generate EXACTLY 1 coding question
+- Each theory question must have exactly 4 options
+- Only ONE option is correct
+- Coding question must be realistic for interviews
+- Return ONLY valid JSON
+- No explanations outside JSON
+
+SCHEMA:
+{
+  "theoryQuestions": [
+    {
+      "id": number,
+      "question": "string",
+      "options": ["string"],
+      "correctAnswer": "string"
+    }
+  ],
+  "codingQuestion": {
+    "prompt": "string",
+    "methodSignature": "string"
+  }
+}
+""";
+        // Include schema again (important) so the retry doesn't drift.
+        String retrySystemPrompt = """
+Your previous response was INVALID.
+
+STRICT CORRECTION REQUIRED.
+
+Topic: "{topic}"
+Level: "{level}"
+
+FAILURE REASON:
+- The generated questions were not sufficiently related to the topic.
+
+CRITICAL REQUIREMENTS:
+
+1) ALL 5 theory questions MUST be strictly and directly about the topic "{topic}".
+2) Do NOT include any generic Java, OOP, JVM, GC, threading, SQL, or REST questions.
+3) Each theory question must explicitly reference "{topic}" or a core concept
+   of "{topic}".
+4) If you cannot generate 5 valid topic-specific theory questions about "{topic}",
+   you MUST return:
+
+   {
+     "error": "INVALID_TOPIC",
+     "message": "Cannot generate enough topic-specific interview questions."
+   }
+
+5) Before returning your JSON, internally verify:
+   - At least 4 of the 5 theory questions are clearly and directly about "{topic}".
+   - If not, regenerate them.
+
+STRUCTURE RULES:
+
+- Generate EXACTLY 5 multiple-choice theory questions
+- Generate EXACTLY 1 coding question
 - Each theory question must have exactly 4 options
 - Only ONE option is correct
 - Coding question must be realistic for interviews
@@ -59,34 +157,6 @@ SCHEMA:
 }
 """;
 
-        // Include schema again (important) so the retry doesn't drift.
-        String retrySystemPrompt = """
-Your previous response was INVALID.
-
-STRICT CORRECTION REQUIRED:
-- ALL questions must be DIRECTLY about the topic
-- Do NOT generalize
-- Do NOT invent unrelated concepts
-- Follow schema EXACTLY
-- Return ONLY valid JSON
-- No explanations outside JSON
-
-SCHEMA:
-{
-  "theoryQuestions": [
-    {
-      "id": number,
-      "question": "string",
-      "options": ["string"],
-      "correctAnswer": "string"
-    }
-  ],
-  "codingQuestion": {
-    "prompt": "string",
-    "methodSignature": "string"
-  }
-}
-""";
 
         String safeTopic = topic == null ? "" : topic.trim();
         String safeLevel = level == null ? "" : level.trim();

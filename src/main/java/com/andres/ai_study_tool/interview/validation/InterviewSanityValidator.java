@@ -23,7 +23,6 @@ public final class InterviewSanityValidator {
             throw new InvalidInterviewRequestException("Empty interview response");
         }
 
-        validateTheoryQuestions(topic, internal.getTheoryQuestions());
         validateCodingQuestion(internal);
     }
 
