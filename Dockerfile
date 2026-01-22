@@ -6,6 +6,9 @@ WORKDIR /app
 COPY mvnw pom.xml ./
 COPY .mvn .mvn
 
+# Make mvnw executable (Windows fix)
+RUN chmod +x mvnw
+
 # Download dependencies first (better caching)
 RUN ./mvnw -B dependency:go-offline
 
